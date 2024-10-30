@@ -1,6 +1,4 @@
-% computes the pose 2d pose vector v from an homogeneous transform A
-% A:[ R t ] 3x3 homogeneous transformation matrix, r translation vector
-% v: [x,y,theta]  2D pose vector
+1;
 function v=t2v(A)
 	v(1:2, 1)=A(1:2,3);
 	v(3,1)=atan2(A(2,1),A(1,1));
@@ -17,7 +15,20 @@ function A=v2t(v)
 	0   0  1  ];
 end
 
+function A=v2t_3d(v)
+  	c=cos(v(3));
+  	s=sin(v(3));
+	A=[c, -s, 0, v(1) ;
+	s,  c, 0, v(2) ;
+	0, 0, 1, 0;
+	0,   0, 0, 1 ];
+end
 
+function v=flattenIsometryByColumns_2d(T)
+v=zeros(6,1);
+v(1:4)=reshape(T(1:2,1:2),4,1);
+v(5:6)=T(1:2,3);
+endfunction
 % normalizes and angle between -pi and pi
 % th: input angle
 % o: output angle

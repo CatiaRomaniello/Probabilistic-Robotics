@@ -1,4 +1,4 @@
-global pose_dim=6;
+global pose_dim=3;
 global landmark_dim=3;
 
 

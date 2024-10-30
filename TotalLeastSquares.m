@@ -1,22 +1,13 @@
 source "./total_least_squares.m"
 
-# synthesis of the virtual world
-
-num_poses=10;
-
+pose_dim = 3;  
+landmark_dim = 3; 
 file_path = '/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/03-PlanarMonocularSLAM/data/world.dat';  
 data = dlmread(file_path);
 
 landmark_ids = data(:, 1);  
 XL_true = transpose(data(:, 2:4));  
 num_landmarks = size(XL_true, 2);  
-
-
-global K; % camera matrix
-global image_rows;
-global image_cols;
-
-source "/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/bundle_adjustment.m"
 file_path = '/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/03-PlanarMonocularSLAM/data/camera.dat';  
 data = dlmread(file_path);
 K = data(2:4,1:3);
@@ -73,7 +64,6 @@ for i = 0:199
     measurements{i + 1} = s;  
 end
 
-
 trajectory_path = '/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/03-PlanarMonocularSLAM/data/trajectoy.dat';
 trajectory_data = dlmread(trajectory_path);
 
@@ -82,13 +72,16 @@ odometry_poses = trajectory_data(:, 2:4);
 groundtruth_poses = trajectory_data(:, 5:7); 
 
 num_poses = size(groundtruth_poses, 1);
-XR_true = zeros(4, 4, num_poses);  
+XR_true = zeros(3, 3, num_poses);  
 
 
 for i = 1:num_poses
-    XR_true(:,:,i) = v2t([groundtruth_poses(i,1), groundtruth_poses(i,2), 0, 0, 0, groundtruth_poses(i,3)]);  
+    #XR_true(:,:,i) = v2t([groundtruth_poses(i,1), groundtruth_poses(i,2), 0, 0, 0, groundtruth_poses(i,3)]);  
+    XR_true(:,:,i) = v2t([groundtruth_poses(i,1), groundtruth_poses(i,2), groundtruth_poses(i,3)]); 
 end
-
+for i = 1:num_poses
+    XR_guess(:,:,i) = v2t([odometry_poses(i,1), odometry_poses(i,2), odometry_poses(i,3)]);  
+end
 
 
 
@@ -120,7 +113,6 @@ for i = 1:length(measurements)
     end
 end
 
-
 num_projection_measurements = measurement_num - 1;
 projection_associations = projection_associations(:, 1:num_projection_measurements);
 Zp = Zp(:, 1:num_projection_measurements);
@@ -129,18 +121,27 @@ Zp = Zp(:, 1:num_projection_measurements);
 ######################################## POSE MEASUREMENTS ########################################
 
 
+#num_pose_measurements = num_poses - 1;
+#Zr = zeros(3, 3, num_pose_measurements);
+#pose_associations = zeros(2, num_pose_measurements);
+
+#for pose_num = 1:num_pose_measurements
+#    Xi = v2t([odometry_poses(pose_num, 1), odometry_poses(pose_num, 2), odometry_poses(pose_num, 3)]);
+#    Xj = v2t([odometry_poses(pose_num + 1, 1), odometry_poses(pose_num + 1, 2), odometry_poses(pose_num + 1, 3)]);
+#    pose_associations(:, pose_num) = transpose([pose_num, pose_num + 1]);
+#    Zr(:, :, pose_num) = inv(Xi) * Xj;
+#end
+
 num_pose_measurements = num_poses - 1;
-Zr = zeros(4, 4, num_pose_measurements);
+Zr = zeros(3, 3, num_pose_measurements);
 pose_associations = zeros(2, num_pose_measurements);
 
 for pose_num = 1:num_pose_measurements
-    Xi = v2t([odometry_poses(pose_num, 1), odometry_poses(pose_num, 2), 0, 0, 0, odometry_poses(pose_num, 3)]);
-    Xj = v2t([odometry_poses(pose_num + 1, 1), odometry_poses(pose_num + 1, 2), 0, 0, 0, odometry_poses(pose_num + 1, 3)]);
+    Xi = v2t([groundtruth_poses(pose_num, 1), groundtruth_poses(pose_num, 2), groundtruth_poses(pose_num, 3)]);
+    Xj = v2t([groundtruth_poses(pose_num + 1, 1), groundtruth_poses(pose_num + 1, 2), groundtruth_poses(pose_num + 1, 3)]);
     pose_associations(:, pose_num) = transpose([pose_num, pose_num + 1]);
     Zr(:, :, pose_num) = inv(Xi) * Xj;
 end
-
-
 
 ############################## GROUNDTRUTH INITIAL GUESS ################################## 
 
@@ -153,27 +154,28 @@ XL_guess=XL_true;
 ############################## CALL SOLVER  ################################## 
 
 # uncomment the following to suppress pose-landmark measurements
-Zl=zeros(3,0);
+%Zl=zeros(3,0);
 
 # uncomment the following to suppress pose-landmark-projection measurements
 #num_landmarks=0;
-Zp=zeros(3,0);
+#Zp=zeros(3,0);
 
 # uncomment the following to suppress pose-pose measurements
 # Zr=zeros(4,4,0);
 
-damping=1e-5;
-kernel_threshold=1e3;
+damping=1;
+kernel_threshold=1;
 num_iterations=30;
-[XR, XL,chi_stats_l, num_inliers_l, chi_stats_p, num_inliers_p, chi_stats_r, num_inliers_r, H, b]=doTotalLS(XR_guess, XL_guess, 
-												      Zl, [], 
+[XR, XL, chi_stats_p, num_inliers_p, chi_stats_r, num_inliers_r, H, b]=doTotalLS(XR_guess, XL_guess, 
 												      Zp, projection_associations, 
 												      Zr, pose_associations, 
 												      num_poses, 
 												      num_landmarks, 
 												      num_iterations, 
 												      damping, 
-												      kernel_threshold);
+												      kernel_threshold,
+                                                      pose_dim, 
+                                                      landmark_dim,K,image_rows, image_cols, rTc);
 												      
 
 
@@ -254,16 +256,9 @@ plot(num_inliers_r, 'b-', "linewidth", 2);
 legend("#inliers"); grid; xlabel("iterations");
 
 subplot(3,2,3);
-plot(chi_stats_l, 'r-', "linewidth", 2);
-legend("Chi Landmark"); grid; xlabel("iterations");
-subplot(3,2,4);
-plot(num_inliers_l, 'b-', "linewidth", 2);
-legend("#inliers"); grid; xlabel("iterations");
-
-subplot(3,2,5);
 plot(chi_stats_p, 'r-', "linewidth", 2);
 legend("Chi Proj"); grid; xlabel("iterations");
-subplot(3,2,6);
+subplot(3,2,4);
 plot(num_inliers_p, 'b-', "linewidth", 2);
 legend("#inliers");grid; xlabel("iterations");
 pause(); 
