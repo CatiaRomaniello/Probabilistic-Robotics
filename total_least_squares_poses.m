@@ -13,81 +13,6 @@ source "./total_least_squares_indices.m"
 #   Jj : 12x6 derivative w.r.t a the error and a perturbation of the
 #       second pose
 
-#function [e,Ji,Jj]=poseErrorAndJacobian(Xi,Xj,Z)
-#  Rx0 = zeros(3,3);
-#  Ry0 = zeros(3,3);
-#  global Rz0;
-#  Ri=Xi(1:3,1:3);
-#  Rj=Xj(1:3,1:3);
-#  ti=Xi(1:3,4);
-#  tj=Xj(1:3,4);
-#  tij=tj-ti;
-#  Ri_transpose=transpose(Ri);
-#  Ji=zeros(12,6);
-#  Jj=zeros(12,6);
-#  
-#  dR_dax=Ri_transpose*Rx0*Rj;
-#  dR_day=Ri_transpose*Ry0*Rj;
-#  dR_daz=Ri_transpose*Rz0*Rj;
-#
-#  Jj(1:9,4)=reshape(dR_dax, 9, 1);
-#  Jj(1:9,5)=reshape(dR_day, 9, 1);
-#  Jj(1:9,6)=reshape(dR_daz, 9, 1);
-#  Jj(10:12,1:3)=Ri_transpose;
-#  
-#  Jj(10:12,4:6)=-Ri_transpose*skew(tj);
-#  Ji=-Jj;
-#
-#  Z_hat=eye(4);
-#  Z_hat(1:3,1:3)=Ri_transpose*Rj;
-#  Z_hat(1:3,4)=Ri_transpose*tij;
-#  e=flattenIsometryByColumns(Z_hat-Z);
-# endfunction;
-
-#function [H,b, chi_tot, num_inliers]=linearizePoses(XR, XL, Zr, associations,num_poses, num_landmarks, kernel_threshold, pose_dim, landmark_dim)
-#  system_size=pose_dim*num_poses+landmark_dim*num_landmarks; 
-#  H=zeros(system_size, system_size);
-#  b=zeros(system_size,1);
-#  chi_tot=0;
-#  num_inliers=0;
-#  for (measurement_num=1:size(Zr,3))
-#    Omega=eye(12);
-#    Omega(1:9,1:9)*=1e3; # we need to pimp the rotation  part a little
-#    pose_i_index=associations(1,measurement_num);
-#    pose_j_index=associations(2,measurement_num);
-#    Z=Zr(:,:,measurement_num);
-#    Xi=XR(:,:,pose_i_index);
-#    Xj=XR(:,:,pose_j_index);
-#    [e,Ji,Jj] = poseErrorAndJacobian(Xi, Xj, Z);
-#    chi=transpose(e)*Omega*e;
-#    if (chi>kernel_threshold)
-#      Omega*=sqrt(kernel_threshold/chi);
-#      chi=kernel_threshold;
-#    else
-#      num_inliers ++;
-#    endif;
-#    chi_tot+=chi;
-#
-#    pose_i_matrix_index=poseMatrixIndex(pose_i_index, num_poses, num_landmarks);
-#    pose_j_matrix_index=poseMatrixIndex(pose_j_index, num_poses, num_landmarks);
-#    
-#    H(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1,
-#      pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)+=transpose(Ji)*Omega*Ji;
-#
-#    H(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1,
-#      pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)+=transpose(Ji)*Omega*Jj;
-#
-#    H(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1,
-#      pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)+=transpose(Ji)*Omega*Ji;
-#
-#    H(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1,
-#      pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)+=transpose(Ji)*Omega*Jj;
-#
-#    b(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)+=transpose(Ji)*Omega*e;
-#    b(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)+=transpose(Ji)*Omega*e;
-#  endfor
-#endfunction
-
 function [e,Ji,Jj]=poseErrorAndJacobian(Xi,Xj,Z)
   Rz0 = [0, -1;
         1, 0];
@@ -104,7 +29,7 @@ function [e,Ji,Jj]=poseErrorAndJacobian(Xi,Xj,Z)
 
   Jj(1:4,3)=reshape(dR_daz, 4, 1);
   Jj(5:6,1:2)=Ri_transpose;
-  Jj(5:6,3)=-Ri_transpose * tij; 
+  Jj(5:6,3)=Ri_transpose*Rz0*tj;
   Ji=-Jj;
 
   Z_hat=eye(3);
@@ -139,7 +64,7 @@ function [H,b, chi_tot, num_inliers]=linearizePoses(XR, XL, Zr, associations,num
   num_inliers=0;
   for (measurement_num=1:size(Zr,3))
     Omega=eye(6);
-    Omega(1:4,1:4)*=1e3; # we need to pimp the rotation  part a little
+    Omega(1:6,1:6)*=1e3; # we need to pimp the rotation  part a little
     pose_i_index=associations(1,measurement_num);
     pose_j_index=associations(2,measurement_num);
     Z=Zr(:,:,measurement_num);

@@ -168,10 +168,10 @@ end
 
 
 landmark_positions = [];
-
+#disp(size(triangulated_points.position));
 for i = 1:length(triangulated_points)
     pos_3D = triangulated_points{i}.position;
-    
+    disp(size(triangulated_points{i}.position));
     
     landmark_positions = [landmark_positions; pos_3D];
 end
@@ -189,6 +189,8 @@ for i = 1:num_landmarks
     Z(i) = landmark_positions(idx + 3);  
 end
 
+XL = [X,Y,Z];
+disp(size(XL));
 figure;
 hold on;
 

@@ -82,142 +82,7 @@ for i = 1:num_poses
     XR_guess(:,:,i) = v2t([odometry_poses(i,1), odometry_poses(i,2), odometry_poses(i,3)]);  
 end
 
-rotation_errors1 = [];
-translation_errors1= [];
 
-for i = 2:num_poses
-
-    rel_T_optimized1 = inv(XR_guess(:, :, i-1)) * XR_guess(:, :, i);
-    rel_T_gt1 = inv(XR_true(:, :, i-1)) * XR_true(:, :, i);
-    error_T1 = inv(rel_T_optimized1) * rel_T_gt1;
-    rot_error1 = atan2(error_T1(2, 1), error_T1(1, 1));
-    rotation_errors1 = [rotation_errors1; rot_error1];
-    trans_error1 = norm(error_T1(1:2, 3));  % Errore di traslazione (solo X e Y)
-    translation_errors1 = [translation_errors1; trans_error1];
-end
-
-
-rmse_rotation1 = sqrt(sum(rotation_errors1 .^ 2) / length(rotation_errors1));
-rmse_translation1 = sqrt(sum(translation_errors1 .^ 2) / length(translation_errors1));
-
-disp('RMSE of poses before optimization:');
-disp(rmse_rotation1);
-disp(rmse_translation1);
-
-
-function point_3D = triangulate(first_obs, second_obs, P1, P2)
-
-    u1 = first_obs(1); 
-    v1 = first_obs(2);  
-    
-    u2 = second_obs(1);  
-    v2 = second_obs(2);  
-
-    A = [
-        (u1 * P1(3,:) - P1(1,:));  
-        (v1 * P1(3,:) - P1(2,:));  
-        (u2 * P2(3,:) - P2(1,:));  
-        (v2 * P2(3,:) - P2(2,:))  
-    ];
-
-    [~, ~, V] = svd(A);
-    
-    X_homogeneous = V(:,end);
-    
-    
-    point_3D = X_homogeneous(1:3) ./ X_homogeneous(4);
-end
-
-
-
-unresolved_landmarks = {};
-triangulated_points = {};
-landmark_map = containers.Map('KeyType', 'int32', 'ValueType', 'any');  
-
-for i = 1:length(measurements)
-    meas_curr = measurements{i};
-    
-    odom_curr = meas_curr.odom_pose;
-    wTr_curr = v2t_3d([odom_curr(1), odom_curr(2), 0, 0, 0, odom_curr(3)]);
-    wTc_curr = inv(wTr_curr * rTc);  
-    k = 1;
-    
-    for j = 1:length(meas_curr.actual_ids)
-        actual_id = meas_curr.actual_ids(j);
-        
-        is_solved = any(cellfun(@(x) x.actual_id == actual_id, triangulated_points));
-        
-        if is_solved
-            idx_solved = find(cellfun(@(x) x.actual_id == actual_id, triangulated_points));
-            continue;  
-        end
-        
-        idx_unresolved = find(cellfun(@(x) x.actual_id == actual_id, unresolved_landmarks));
-        
-        if ~isempty(idx_unresolved)
-            
-            first_obs = unresolved_landmarks{idx_unresolved}.first_observation;
-            first_pose = unresolved_landmarks{idx_unresolved}.first_pose;
-            
-            img_point = meas_curr.image_points(k:k+1, :);
-            second_obs = transpose(img_point);
-   
-            P1 = K * [first_pose(1:3, 1:3), first_pose(1:3, 4)];
-            P2 = K * [wTc_curr(1:3, 1:3), wTc_curr(1:3, 4)];
-            
-            % Triangolazione
-            landmark_3D = triangulate(first_obs, second_obs, P1, P2);
-            
-            % Aggiungi o aggiorna il landmark nel dizionario
-            if isKey(landmark_map, actual_id)
-                existing_position = landmark_map(actual_id);
-                %landmark_map(actual_id) = (existing_position + landmark_3D) / 2;  
-                landmark_map(actual_id) = (existing_position); 
-            else
-                landmark_map(actual_id) = landmark_3D; 
-            end
-
-            triangulated_points{end + 1} = struct('actual_id', actual_id, 'position', landmark_map(actual_id));
-            unresolved_landmarks(idx_unresolved) = []; 
-        else
-            img_point = meas_curr.image_points(k:k+1, :);
-            img_point = transpose(img_point);
-
-            unresolved_landmarks{end + 1} = struct( ...
-                'actual_id', actual_id, ...
-                'first_observation', img_point, ...
-                'first_pose', wTc_curr);
-        end
-        k = k + 2;  
-    end
-end
-
-
-
-
-landmark_vector = zeros(3, 1000); 
-
-for i = 1:1000
-    actual_id = i - 1;  
-
-    
-    if isKey(landmark_map, actual_id)
-        landmark_vector(:, i) = landmark_map(actual_id);
-    else
-        
-        landmark_vector(:, i) = zeros(3,1); 
-    end
-    if norm(landmark_vector(:,i))>20
-        landmark_vector(:, i) = zeros(3,1); 
-    end
-
-end
-disp(':)');
-
-disp(landmark_vector(:, 1:10)); 
-
-
-XL_guess = landmark_vector;
 
 
 ######################################## PROJECTION MEASUREMENTS ########################################
@@ -255,25 +120,28 @@ end
 ######################################## POSE MEASUREMENTS ########################################
 
 
+
 num_pose_measurements = num_poses - 1;
 Zr = zeros(3, 3, num_pose_measurements);
 pose_associations = zeros(2, num_pose_measurements);
 
 for pose_num = 1:num_pose_measurements
-    Xi = v2t([odometry_poses(pose_num, 1), odometry_poses(pose_num, 2), odometry_poses(pose_num, 3)]);
-    Xj = v2t([odometry_poses(pose_num + 1, 1), odometry_poses(pose_num + 1, 2), odometry_poses(pose_num + 1, 3)]);
+    Xi = v2t([groundtruth_poses(pose_num, 1), groundtruth_poses(pose_num, 2), groundtruth_poses(pose_num, 3)]);
+    Xj = v2t([groundtruth_poses(pose_num + 1, 1), groundtruth_poses(pose_num + 1, 2), groundtruth_poses(pose_num + 1, 3)]);
     pose_associations(:, pose_num) = transpose([pose_num, pose_num + 1]);
-    Zr(:, :, pose_num) = inv(Xi) * Xj;
+    Zr(:, :, pose_num) = inv(Xi)*Xj;
 end
-
-
-
+#for pose_num = 1:num_pose_measurements
+#    Xi = v2t([odometry_poses(pose_num, 1), odometry_poses(pose_num, 2), odometry_poses(pose_num, 3)]);
+#    Xj = v2t([odometry_poses(pose_num + 1, 1), odometry_poses(pose_num + 1, 2), odometry_poses(pose_num + 1, 3)]);
+#    pose_associations(:, pose_num) = transpose([pose_num, pose_num + 1]);
+#    Zr(:, :, pose_num) = inv(Xi) * Xj;
+#end
 
 ############################## GROUNDTRUTH INITIAL GUESS ################################## 
 
-
-#XR_guess=XR_true;
-#XL_guess=XL_true;
+XR_guess=XR_true;
+XL_guess=XL_true;
 
 
 
@@ -287,9 +155,9 @@ end
 %Zr=zeros(3,3,0);
 
 damping=1;
-kernel_threshold=1000;
-kernel_threshold_p=10000;
-num_iterations=300;
+kernel_threshold=1;
+kernel_threshold_p=1000;
+num_iterations=30;
 [XR, XL, chi_stats_p, num_inliers_p, chi_stats_r, num_inliers_r, H, b]=doTotalLS(XR_guess, XL_guess, 
 												      Zp, projection_associations, 
 												      Zr, pose_associations, 
@@ -313,7 +181,7 @@ translation_errors = [];
 for i = 2:num_poses
 
     rel_T_optimized = inv(XR(:, :, i-1)) * XR(:, :, i);
-    rel_T_gt = inv(XR_true(:, :, i-1)) * XR_true(:, :, i);
+    rel_T_gt = inv(XR_guess(:, :, i-1)) * XR_guess(:, :, i);
     error_T = inv(rel_T_optimized) * rel_T_gt;
     rot_error = atan2(error_T(2, 1), error_T(1, 1));
     rotation_errors = [rotation_errors; rot_error];
@@ -321,18 +189,17 @@ for i = 2:num_poses
     translation_errors = [translation_errors; trans_error];
 end
 
-
 rmse_rotation = sqrt(sum(rotation_errors .^ 2) / length(rotation_errors));
 rmse_translation = sqrt(sum(translation_errors .^ 2) / length(translation_errors));
 
 disp(rmse_rotation);
 disp(rmse_translation);
 
-
-errors_guess = sqrt(sum((XL_guess - XL_true).^2, 1));  
-rmse_landmarks_guess = sqrt(mean(errors_guess.^2));   
+errors_guess = sqrt(sum((XL_guess - XL_true).^2, 1)); 
+rmse_landmarks_guess = sqrt(mean(errors_guess.^2));    
 disp('RMSE of landmarks before optimization:');
 disp(rmse_landmarks_guess);
+
 
 errors_optimized = sqrt(sum((XL - XL_true).^2, 1));    
 rmse_landmarks_optimized = sqrt(mean(errors_optimized.^2)); 
@@ -391,17 +258,17 @@ hold on;
 grid;
 title("chi evolution");
 
-subplot(2,2,1);
+subplot(3,2,1);
 plot(chi_stats_r, 'r-', "linewidth", 2);
 legend("Chi Poses"); grid; xlabel("iterations");
-subplot(2,2,2);
+subplot(3,2,2);
 plot(num_inliers_r, 'b-', "linewidth", 2);
 legend("#inliers"); grid; xlabel("iterations");
 
-subplot(2,2,3);
+subplot(3,2,3);
 plot(chi_stats_p, 'r-', "linewidth", 2);
 legend("Chi Proj"); grid; xlabel("iterations");
-subplot(2,2,4);
+subplot(3,2,4);
 plot(num_inliers_p, 'b-', "linewidth", 2);
 legend("#inliers");grid; xlabel("iterations");
 pause(); 

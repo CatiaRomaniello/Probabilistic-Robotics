@@ -16,8 +16,8 @@ function A=v2t(v)
 end
 
 function A=v2t_3d(v)
-  	c=cos(v(3));
-  	s=sin(v(3));
+  	c=cos(v(6));
+  	s=sin(v(6));
 	A=[c, -s, 0, v(1) ;
 	s,  c, 0, v(2) ;
 	0, 0, 1, 0;
@@ -25,9 +25,9 @@ function A=v2t_3d(v)
 end
 
 function v=flattenIsometryByColumns_2d(T)
-v=zeros(6,1);
-v(1:4)=reshape(T(1:2,1:2),4,1);
-v(5:6)=T(1:2,3);
+	v=zeros(6,1);
+	v(1:4)=reshape(T(1:2,1:2),4,1);
+	v(5:6)=T(1:2,3);
 endfunction
 % normalizes and angle between -pi and pi
 % th: input angle

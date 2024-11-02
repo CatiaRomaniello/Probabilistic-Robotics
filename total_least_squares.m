@@ -1,4 +1,3 @@
-source "./geometry_helpers_3d.m"
 source "./geometry_helpers_2d.m"
 source "./total_least_squares_indices.m"
 source "./total_least_squares_poses.m"
@@ -61,6 +60,7 @@ function [XR, XL, chi_stats_p, num_inliers_p,chi_stats_r, num_inliers_r, H, b] =
 	     num_iterations,
 	     damping,
 	     kernel_threshold,
+       kernel_threshold_p,
        pose_dim,
        landmark_dim, K,image_rows, image_cols, rTc)
 
@@ -76,7 +76,7 @@ function [XR, XL, chi_stats_p, num_inliers_p,chi_stats_r, num_inliers_r, H, b] =
     b=zeros(system_size,1);
    
     if (num_landmarks) 
-      [H_projections, b_projections, chi_, num_inliers_] = linearizeProjections(XR, XL, Zp, projection_associations,num_poses, num_landmarks, kernel_threshold, pose_dim, landmark_dim,K,image_rows, image_cols, rTc);
+      [H_projections, b_projections, chi_, num_inliers_] = linearizeProjections(XR, XL, Zp, projection_associations,num_poses, num_landmarks, kernel_threshold_p, pose_dim, landmark_dim,K,image_rows, image_cols, rTc);
       chi_stats_p(iteration)+=chi_;
       num_inliers_p(iteration)=num_inliers_;
     endif;
@@ -92,7 +92,7 @@ function [XR, XL, chi_stats_p, num_inliers_p,chi_stats_r, num_inliers_r, H, b] =
        H+=H_projections;
        b+=b_projections;
     endif;
-
+    
     H+=eye(system_size)*damping;
     dx=zeros(system_size,1);
 

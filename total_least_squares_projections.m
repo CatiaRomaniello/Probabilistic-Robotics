@@ -27,8 +27,6 @@ function [is_valid, e,Jr,Jl]=projectionErrorAndJacobian(Xr,Xl,z,K, image_rows, i
   Xr_3d(1:2,4) = Xr(1:2,3);
 
   wTc = Xr_3d*rTc; #camera frame wrt to world frame 
-  %iR=transpose(Xr(1:3,1:3));
-  %it=-iR*Xr(1:3,4);
   iR = transpose(wTc(1:3,1:3));
   it = -iR*wTc(1:3,4);
 
@@ -42,8 +40,8 @@ function [is_valid, e,Jr,Jl]=projectionErrorAndJacobian(Xr,Xl,z,K, image_rows, i
   Jwr_t1(1:3,4:6)=iR*skew(Xl);
 
   Jwr = zeros(3,3);
-  Jwr(1:2,1:2) = Jwr_t1(1:2,1:2);
-  Jwr_t1(1:2,3) = Jwr_t1(1:2,6);
+  Jwr(1:3,1:2) = Jwr_t1(1:3,1:2);
+  Jwr(1:3,3) = Jwr_t1(1:3,6);
   Jwl=iR;
   
   p_cam=K*pw;
@@ -94,7 +92,7 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
   for (measurement_num=1:size(Zl,2))
     pose_index=associations(1,measurement_num);
     landmark_index=associations(2,measurement_num);
-    landmark_index = landmark_index + 1;
+    landmark_index = landmark_index;
     z=Zl(:,measurement_num);
     Xr=XR(:,:,pose_index);
     Xl=XL(:,landmark_index);
@@ -103,6 +101,7 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
        continue;
     endif;
     chi=transpose(e)*e;
+    w = 1;
     if (chi>kernel_threshold)
       e*=sqrt(kernel_threshold/chi);
       chi=kernel_threshold;
@@ -111,23 +110,32 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
     endif;
     chi_tot+=chi;
 
+    omega = eye(2)*1e-2;
+    Hrr = transpose(Jr) * omega * Jr;
+    Hrl = transpose(Jr) * omega * Jl;
+    Hlr = transpose(Jl) * omega * Jr;
+    Hll = transpose(Jl) * omega * Jl;
+    br = transpose(Jr) * omega * e;
+    bl = transpose(Jl) * omega * e;
+
     pose_matrix_index=poseMatrixIndex(pose_index, num_poses, num_landmarks);
     landmark_matrix_index=landmarkMatrixIndex(landmark_index, num_poses, num_landmarks);
 
 
-    H(pose_matrix_index:pose_matrix_index+pose_dim-1,
-      pose_matrix_index:pose_matrix_index+pose_dim-1)+=transpose(Jr)*Jr;
 
     H(pose_matrix_index:pose_matrix_index+pose_dim-1,
-      landmark_matrix_index:landmark_matrix_index+landmark_dim-1)+=transpose(Jr)*Jl;
+      pose_matrix_index:pose_matrix_index+pose_dim-1)+=Hrr;
+
+    H(pose_matrix_index:pose_matrix_index+pose_dim-1,
+      landmark_matrix_index:landmark_matrix_index+landmark_dim-1)+=Hrl;
 
     H(landmark_matrix_index:landmark_matrix_index+landmark_dim-1,
-      landmark_matrix_index:landmark_matrix_index+landmark_dim-1)+=transpose(Jl)*Jl;
+      landmark_matrix_index:landmark_matrix_index+landmark_dim-1)+=Hll;
 
     H(landmark_matrix_index:landmark_matrix_index+landmark_dim-1,
-      pose_matrix_index:pose_matrix_index+pose_dim-1)+=transpose(Jl)*Jr;
+      pose_matrix_index:pose_matrix_index+pose_dim-1)+=Hlr;
 
-    b(pose_matrix_index:pose_matrix_index+pose_dim-1)+=transpose(Jr)*e;
-    b(landmark_matrix_index:landmark_matrix_index+landmark_dim-1)+=transpose(Jl)*e;
+    b(pose_matrix_index:pose_matrix_index+pose_dim-1)+=br;
+    b(landmark_matrix_index:landmark_matrix_index+landmark_dim-1)+=bl;
   endfor
 endfunction
