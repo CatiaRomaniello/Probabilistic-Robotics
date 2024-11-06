@@ -2,13 +2,13 @@ source "./total_least_squares.m"
 
 pose_dim = 3;  
 landmark_dim = 3; 
-file_path = '/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/03-PlanarMonocularSLAM/data/world.dat';  
+file_path = '03-PlanarMonocularSLAM/data/world.dat';  
 data = dlmread(file_path);
 
 landmark_ids = data(:, 1);  
 XL_true = transpose(data(:, 2:4));  
 num_landmarks = size(XL_true, 2);  
-file_path = '/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/03-PlanarMonocularSLAM/data/camera.dat';  
+file_path = '03-PlanarMonocularSLAM/data/camera.dat';  
 data = dlmread(file_path);
 K = data(2:4,1:3);
 rTc = data(6:9,1:4);
@@ -16,7 +16,7 @@ z_n= data(10,2);
 z_f = data(11,2);
 image_cols = data(12,2);
 image_rows = data(13,2);
-folder_path = '/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/03-PlanarMonocularSLAM/data/';
+folder_path = '03-PlanarMonocularSLAM/data/';
 file_base_name = 'meas-';  
 file_extension = '.dat';   
 
@@ -65,7 +65,7 @@ for i = 0:199
     
 end
 
-trajectory_path = '/home/catia/Probabilistic_Robotics/Probabilistic-Robotics/03-PlanarMonocularSLAM/data/trajectoy.dat';
+trajectory_path = '03-PlanarMonocularSLAM/data/trajectoy.dat';
 trajectory_data = dlmread(trajectory_path);
 
 pose_ids = trajectory_data(:, 1);
@@ -92,7 +92,7 @@ for i = 2:num_poses
     error_T1 = inv(rel_T_optimized1) * rel_T_gt1;
     rot_error1 = atan2(error_T1(2, 1), error_T1(1, 1));
     rotation_errors1 = [rotation_errors1; rot_error1];
-    trans_error1 = norm(error_T1(1:2, 3));  % Errore di traslazione (solo X e Y)
+    trans_error1 = norm(error_T1(1:2, 3));  
     translation_errors1 = [translation_errors1; trans_error1];
 end
 
@@ -104,117 +104,91 @@ disp('RMSE of poses before optimization:');
 disp(rmse_rotation1);
 disp(rmse_translation1);
 
+landmark_observations = containers.Map('KeyType', 'int32', 'ValueType', 'any');
+landmark_map = containers.Map('KeyType', 'int32', 'ValueType', 'any');
 
-function point_3D = triangulate(first_obs, second_obs, P1, P2)
-
-    u1 = first_obs(1); 
-    v1 = first_obs(2);  
-    
-    u2 = second_obs(1);  
-    v2 = second_obs(2);  
-
-    A = [
-        (u1 * P1(3,:) - P1(1,:));  
-        (v1 * P1(3,:) - P1(2,:));  
-        (u2 * P2(3,:) - P2(1,:));  
-        (v2 * P2(3,:) - P2(2,:))  
-    ];
-
-    [~, ~, V] = svd(A);
-    
-    X_homogeneous = V(:,end);
-    
-    
-    point_3D = X_homogeneous(1:3) ./ X_homogeneous(4);
-end
-
-
-
-unresolved_landmarks = {};
-triangulated_points = {};
-landmark_map = containers.Map('KeyType', 'int32', 'ValueType', 'any');  
 
 for i = 1:length(measurements)
     meas_curr = measurements{i};
     
     odom_curr = meas_curr.odom_pose;
     wTr_curr = v2t_3d([odom_curr(1), odom_curr(2), 0, 0, 0, odom_curr(3)]);
-    wTc_curr = inv(wTr_curr * rTc);  
+    wTc_curr = inv(rTc)*inv(wTr_curr);  
     k = 1;
     
     for j = 1:length(meas_curr.actual_ids)
-        actual_id = meas_curr.actual_ids(j);
-        
-        is_solved = any(cellfun(@(x) x.actual_id == actual_id, triangulated_points));
-        
-        if is_solved
-            idx_solved = find(cellfun(@(x) x.actual_id == actual_id, triangulated_points));
-            continue;  
-        end
-        
-        idx_unresolved = find(cellfun(@(x) x.actual_id == actual_id, unresolved_landmarks));
-        
-        if ~isempty(idx_unresolved)
-            
-            first_obs = unresolved_landmarks{idx_unresolved}.first_observation;
-            first_pose = unresolved_landmarks{idx_unresolved}.first_pose;
-            
-            img_point = meas_curr.image_points(k:k+1, :);
-            second_obs = transpose(img_point);
-   
-            P1 = K * [first_pose(1:3, 1:3), first_pose(1:3, 4)];
-            P2 = K * [wTc_curr(1:3, 1:3), wTc_curr(1:3, 4)];
-            
-            % Triangolazione
-            landmark_3D = triangulate(first_obs, second_obs, P1, P2);
-            
-            % Aggiungi o aggiorna il landmark nel dizionario
-            if isKey(landmark_map, actual_id)
-                existing_position = landmark_map(actual_id);
-                %landmark_map(actual_id) = (existing_position + landmark_3D) / 2;  
-                landmark_map(actual_id) = (existing_position); 
-            else
-                landmark_map(actual_id) = landmark_3D; 
-            end
-
-            triangulated_points{end + 1} = struct('actual_id', actual_id, 'position', landmark_map(actual_id));
-            unresolved_landmarks(idx_unresolved) = []; 
-        else
-            img_point = meas_curr.image_points(k:k+1, :);
-            img_point = transpose(img_point);
-
-            unresolved_landmarks{end + 1} = struct( ...
-                'actual_id', actual_id, ...
-                'first_observation', img_point, ...
-                'first_pose', wTc_curr);
-        end
-        k = k + 2;  
+    actual_id = meas_curr.actual_ids(j);
+    img_point = meas_curr.image_points(k:k+1, :);
+    
+    if isKey(landmark_observations, actual_id)
+        temp = landmark_observations(actual_id);
+        temp.image_points = [temp.image_points, img_point];
+        temp.camera_poses = cat(3, temp.camera_poses, wTc_curr);
+        landmark_observations(actual_id) = temp;
+    else
+        temp = struct('image_points', img_point, 'camera_poses', wTc_curr);
+        landmark_observations(actual_id) = temp;
     end
+        
+    k = k + 2;  
+    end
+end
+
+for actual_id = keys(landmark_observations)
+    observations = landmark_observations(actual_id{1});
+    
+    if size(observations.image_points, 2) < 4
+        continue;  
+    end
+    image_points = observations.image_points;
+    camera_poses = observations.camera_poses;
+
+
+    A = [];
+    for idx = 1:size(image_points, 2)
+        u = image_points(1, idx);
+        v = image_points(2, idx);
+
+        P = K * [camera_poses(1:3, 1:3, idx), camera_poses(1:3, 4, idx)];
+        
+        A = [
+            A;
+            u * P(3, :) - P(1, :);  
+            v * P(3, :) - P(2, :) 
+        ];
+    end
+    if size(A,1) < 4
+        continue;
+    end
+
+    [~, D, V] = svd(A);
+    X_homogeneous = V(:, end);
+
+    landmark_3D = X_homogeneous(1:3) / X_homogeneous(4);
+
+    landmark_map(actual_id{1}) = landmark_3D;
 end
 
 
 
-
-landmark_vector = zeros(3, 1000); 
-
-for i = 1:1000
-    actual_id = i - 1;  
-
+num_landmarks = size(keys(landmark_observations), 2); 
+landmark_vector = zeros(4, num_landmarks); 
+epsilon = 1;
+landmark_keys = keys(landmark_observations);
+j = 1;
+for i = 1:num_landmarks
+    actual_id = landmark_keys{i};  
     
     if isKey(landmark_map, actual_id)
-        landmark_vector(:, i) = landmark_map(actual_id);
-    else
-        
-        landmark_vector(:, i) = zeros(3,1); 
-    end
-    if norm(landmark_vector(:,i))>20
-        landmark_vector(:, i) = zeros(3,1); 
+        landmark_vector(1:3, i) = landmark_map(actual_id);
+    else 
+        landmark_vector(1:3, i) = zeros(3,1);
+        j++;
     end
 
+    landmark_vector(4, i) = actual_id;
 end
-disp(':)');
-
-disp(landmark_vector(:, 1:10)); 
+disp(j);
 
 
 XL_guess = landmark_vector;
@@ -237,20 +211,17 @@ for i = 1:length(measurements)
     point_ids = meas.point_ids; 
     actual_ids = meas.actual_ids; 
     image_points = meas.image_points;  
-    
     k = 1;
     for j = 1:length(point_ids)
-        landmark_num = actual_ids(j)+1;  
+        landmark_num = actual_ids(j);  
         z_img = image_points(k:k+1, :); 
         projection_associations(:, measurement_num) = [pose_num; landmark_num];
         Zp(:, measurement_num) = transpose(z_img);
+        
         measurement_num++;
         k+=2;
     end
 end
-
-
-
 
 ######################################## POSE MEASUREMENTS ########################################
 
@@ -268,13 +239,36 @@ end
 
 
 
+num_true_landmarks = size(XL_true, 2); 
 
-############################## GROUNDTRUTH INITIAL GUESS ################################## 
+sum_squared_errors = 0;
+count_valid_landmarks = 0;
+
+for i = 1:num_true_landmarks
+    actual_id = i - 1;  
+    estimated_landmark = [];  
+
+    if any(XL_guess(4, :) == actual_id)  
+
+        estimated_landmark = XL_guess(1:3, XL_guess(4, :) == actual_id); 
+
+        if ~isempty(estimated_landmark)&& norm(estimated_landmark) > 0
+            error = norm(estimated_landmark - XL_true(:, actual_id+1));  
+            sum_squared_errors = sum_squared_errors + error^2;  
+            count_valid_landmarks = count_valid_landmarks + 1;  
+        end
+    end
+end
 
 
-#XR_guess=XR_true;
-#XL_guess=XL_true;
+if count_valid_landmarks > 0
+    rmse_landmarks_optimized = sqrt(sum_squared_errors / count_valid_landmarks);
+else
+    rmse_landmarks_optimized = NaN; 
+end
 
+disp('RMSE of landmarks before optimization:');
+disp(rmse_landmarks_optimized);
 
 
 ############################## CALL SOLVER  ################################## 
@@ -286,10 +280,10 @@ end
 # uncomment the following to suppress pose-pose measurements
 %Zr=zeros(3,3,0);
 
-damping=1;
-kernel_threshold=1000;
-kernel_threshold_p=10000;
-num_iterations=300;
+damping=0.1;
+kernel_threshold=10;
+kernel_threshold_p=100;
+num_iterations=70;
 [XR, XL, chi_stats_p, num_inliers_p, chi_stats_r, num_inliers_r, H, b]=doTotalLS(XR_guess, XL_guess, 
 												      Zp, projection_associations, 
 												      Zr, pose_associations, 
@@ -325,22 +319,46 @@ end
 rmse_rotation = sqrt(sum(rotation_errors .^ 2) / length(rotation_errors));
 rmse_translation = sqrt(sum(translation_errors .^ 2) / length(translation_errors));
 
+disp('RMSE of poses after optimization:');
 disp(rmse_rotation);
 disp(rmse_translation);
 
 
-errors_guess = sqrt(sum((XL_guess - XL_true).^2, 1));  
-rmse_landmarks_guess = sqrt(mean(errors_guess.^2));   
-disp('RMSE of landmarks before optimization:');
-disp(rmse_landmarks_guess);
+sum_squared_errors = 0;
+count_valid_landmarks = 0;
 
-errors_optimized = sqrt(sum((XL - XL_true).^2, 1));    
-rmse_landmarks_optimized = sqrt(mean(errors_optimized.^2)); 
+
+for i = 1:num_true_landmarks
+    actual_id = i - 1; 
+    estimated_landmark = [];  
+
+    if any(XL(4, :) == actual_id)  
+
+        estimated_landmark = XL(1:3, XL(4, :) == actual_id); 
+
+        if ~isempty(estimated_landmark)&& norm(estimated_landmark) > 0
+            error = norm(estimated_landmark - XL_true(:, actual_id + 1));  
+            if error>1
+                disp('-----');
+                disp(error);
+                disp(actual_id)
+            end
+            sum_squared_errors = sum_squared_errors + error^2; 
+            count_valid_landmarks = count_valid_landmarks + 1;  
+        end
+    end
+end
+
+if count_valid_landmarks > 0
+    rmse_landmarks_optimized = sqrt(sum_squared_errors / count_valid_landmarks);
+else
+    rmse_landmarks_optimized = NaN; 
+end
+
 disp('RMSE of landmarks after optimization:');
 disp(rmse_landmarks_optimized);
      
-												      
-# Plot State
+
 XR_vec = zeros(3, num_poses);
 XR_true_vec = zeros(3, num_poses);
 XR_guess_vec = zeros(3, num_poses);
@@ -354,7 +372,7 @@ figure(1);
 hold on;
 grid;
 
-subplot(2,2,1);
+subplot(2,1,1);
 title("Landmark Initial Guess");
 plot(XL_true(1,:),XL_true(2,:),'b*',"linewidth",2);
 hold on;
@@ -362,29 +380,13 @@ plot(XL_guess(1,:),XL_guess(2,:),'ro',"linewidth",2);
 legend("Landmark True", "Guess");grid;
 
 
-subplot(2,2,2);
+subplot(2,1,2);
 title("Landmark After Optimization");
 plot(XL_true(1,:),XL_true(2,:),'b*',"linewidth",2);
 hold on;
 plot(XL(1,:),XL(2,:),'ro',"linewidth",2);
 legend("Landmark True", "Guess");grid;
 
-
-subplot(2,2,3);
-title("Poses Initial Guess");
-plot(XR_true_vec(1,:),XR_true_vec(2,:),'b*',"linewidth",2);
-hold on;
-plot(XR_guess_vec(1,:),XR_guess_vec(2,:),'ro',"linewidth",2);
-legend("Poses True", "Guess");grid;
-
-
-subplot(2,2,4);
-title("Poses After Optimization");
-plot(XR_true_vec(1,:),XR_true_vec(2,:),'b*',"linewidth",2);
-hold on;
-plot(XR_vec(1,:),XR_vec(2,:),'ro',"linewidth",2);
-legend("Poses True", "Guess"); grid;
-pause(); 
 
 figure(2);
 hold on;
@@ -405,6 +407,7 @@ subplot(2,2,4);
 plot(num_inliers_p, 'b-', "linewidth", 2);
 legend("#inliers");grid; xlabel("iterations");
 pause(); 
+
 figure(3);
 title("H matrix");
 H_ =  H./H;                      # NaN and 1 element
@@ -416,3 +419,18 @@ hold on;
 image([0.5, size(H_,2)-0.5], [0.5, size(H_,1)-0.5], H_*64);
 hold off;
 pause(); 
+
+figure(4);
+title("Poses Comparison: True, Initial Guess, and After Optimization");
+
+plot(XR_true_vec(1,:), XR_true_vec(2,:), 'go', "linewidth", 2); 
+hold on;
+plot(XR_guess_vec(1,:), XR_guess_vec(2,:), 'ro', "linewidth", 2);
+plot(XR_vec(1,:), XR_vec(2,:), 'c*', "linewidth", 2);
+legend("Poses True", "Initial Guess", "After Optimization");
+grid on;
+xlabel("X Position");
+ylabel("Y Position");
+hold off;
+pause();
+

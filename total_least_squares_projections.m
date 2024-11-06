@@ -4,12 +4,12 @@ source "./geometry_helpers_2d.m"
 source "./total_least_squares_indices.m"
 # error and jacobian of a measured landmark
 # input:
-#   Xr: the robot pose in world frame (4x4 homogeneous matrix)
+#   Xr: the robot pose in world frame (3x3 homogeneous matrix) ->then transformed in 4x4 homogenepus matrix since rTc is 4x4
 #   Xl: the landmark pose (3x1 vector, 3d pose in world frame)
 #   z:  projection of the landmark on the image plane
 # output:
 #   e: 2x1 is the difference between prediction and measurement
-#   Jr: 2x6 derivative w.r.t a the error and a perturbation on the
+#   Jr: 2x3 derivative w.r.t a the error and a perturbation on the
 #       pose
 #   Jl: 2x3 derivative w.r.t a the error and a perturbation on the
 #       landmark
@@ -31,13 +31,14 @@ function [is_valid, e,Jr,Jl]=projectionErrorAndJacobian(Xr,Xl,z,K, image_rows, i
   it = -iR*wTc(1:3,4);
 
   pw=iR*Xl+it; 
+
   if (pw(3)<0)
      return;
   endif
 
   Jwr_t1=zeros(3,6);
   Jwr_t1(1:3,1:3)=-iR;
-  Jwr_t1(1:3,4:6)=iR*skew(Xl);
+  Jwr_t1(:,4:6)=iR*skew(Xl);
 
   Jwr = zeros(3,3);
   Jwr(1:3,1:2) = Jwr_t1(1:3,1:2);
@@ -62,11 +63,12 @@ function [is_valid, e,Jr,Jl]=projectionErrorAndJacobian(Xr,Xl,z,K, image_rows, i
   Jr=Jp*K*Jwr;
   Jl=Jp*K*Jwl;
   is_valid=true;
+  
 endfunction;
 
 
 #linearizes the robot-landmark measurements
-#   XR: the initial robot poses (4x4xnum_poses: array of homogeneous matrices)
+#   XR: the initial robot poses (3x3xnum_poses: array of homogeneous matrices)
 #   XL: the initial landmark estimates (3xnum_landmarks matrix of landmarks)
 #   Z:  the measurements (2xnum_measurements)
 #   associations: 2xnum_measurements. 
@@ -91,11 +93,18 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
   num_inliers=0;
   for (measurement_num=1:size(Zl,2))
     pose_index=associations(1,measurement_num);
-    landmark_index=associations(2,measurement_num);
-    landmark_index = landmark_index;
+    actual_id=associations(2,measurement_num);
+    landmark_index = find(XL(4, :) == actual_id, 1);
+    if isempty(landmark_index) 
+    continue; % Salta questo landmark se non è valido
+    end
+
     z=Zl(:,measurement_num);
     Xr=XR(:,:,pose_index);
-    Xl=XL(:,landmark_index);
+    Xl = XL(1:3, landmark_index); 
+    if norm(Xl) == 0
+      continue;
+    end
     [is_valid, e,Jr,Jl] = projectionErrorAndJacobian(Xr, Xl, z, K,image_rows, image_cols, rTc);
     if (! is_valid)
        continue;
@@ -104,13 +113,14 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
     w = 1;
     if (chi>kernel_threshold)
       e*=sqrt(kernel_threshold/chi);
+      w = 1/kernel_threshold;
       chi=kernel_threshold;
     else
       num_inliers++;
     endif;
     chi_tot+=chi;
 
-    omega = eye(2)*1e-2;
+    omega = w*eye(2);
     Hrr = transpose(Jr) * omega * Jr;
     Hrl = transpose(Jr) * omega * Jl;
     Hlr = transpose(Jl) * omega * Jr;
@@ -119,6 +129,7 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
     bl = transpose(Jl) * omega * e;
 
     pose_matrix_index=poseMatrixIndex(pose_index, num_poses, num_landmarks);
+    
     landmark_matrix_index=landmarkMatrixIndex(landmark_index, num_poses, num_landmarks);
 
 

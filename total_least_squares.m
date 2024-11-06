@@ -6,7 +6,7 @@ source "./total_least_squares_projections.m"
 # implementation of the boxplus
 # applies a perturbation to a set of landmarks and robot poses
 # input:
-#   XR: the robot poses (4x4xnum_poses: array of homogeneous matrices)
+#   XR: the robot poses (3x3xnum_poses: array of homogeneous matrices)
 #   XL: the landmark pose (3xnum_landmarks matrix of landmarks)
 #   num_poses: number of poses in XR (added for consistency)
 #   num_landmarks: number of landmarks in XL (added for consistency)
@@ -49,8 +49,8 @@ endfunction;
 # output:
 #   XR: the robot poses after optimization
 #   XL: the landmarks after optimization
-#   chi_stats_{l,p,r}: array 1:num_iterations, containing evolution of chi2 for landmarks, projections and poses
-#   num_inliers{l,p,r}: array 1:num_iterations, containing evolution of inliers landmarks, projections and poses
+#   chi_stats_{p,r}: array 1:num_iterations, containing evolution of chi2 for projections and poses
+#   num_inliers{p,r}: array 1:num_iterations, containing evolution of inliers projections and poses
 
 function [XR, XL, chi_stats_p, num_inliers_p,chi_stats_r, num_inliers_r, H, b] = doTotalLS(XR, XL,
 	     Zp, projection_associations,
@@ -99,10 +99,10 @@ function [XR, XL, chi_stats_p, num_inliers_p,chi_stats_r, num_inliers_r, H, b] =
     % we solve the linear system, blocking the first pose
     % this corresponds to "remove" from H and b the locks
     % of the 1st pose, while solving the system
-
+    XL_coords_only = XL(1:3, :); 
     dx(pose_dim+1:end)=-(H(pose_dim+1:end,pose_dim+1:end)\b(pose_dim+1:end,1));
-    [XR, XL]=boxPlus(XR,XL,num_poses, num_landmarks, dx, pose_dim, landmark_dim);
-
+    [XR, XL_coords_only]=boxPlus(XR,XL_coords_only,num_poses, num_landmarks, dx, pose_dim, landmark_dim);
+    XL(1:3, :) = XL_coords_only;
 
   endfor
 endfunction

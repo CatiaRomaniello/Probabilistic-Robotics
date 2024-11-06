@@ -4,13 +4,13 @@ source "./total_least_squares_indices.m"
 
 # error and jacobian of a measured pose, all poses are in world frame
 # input:
-#   Xi: the observing robot pose (4x4 homogeneous matrix)
-#   Xj: the observed robot pose (4x4 homogeneous matrix)
+#   Xi: the observing robot pose (3x3 homogeneous matrix)
+#   Xj: the observed robot pose (3x3 homogeneous matrix)
 #   Z:   the relative transform measured between Xr1 and Xr2
-#   e: 12x1 is the difference between prediction, and measurement, vectorized
-#   Ji : 12x6 derivative w.r.t a the error and a perturbation of the
+#   e: 6x1 is the difference between prediction, and measurement, vectorized
+#   Ji : 6x3 derivative w.r.t a the error and a perturbation of the
 #       first pose
-#   Jj : 12x6 derivative w.r.t a the error and a perturbation of the
+#   Jj : 6x3 derivative w.r.t a the error and a perturbation of the
 #       second pose
 
 function [e,Ji,Jj]=poseErrorAndJacobian(Xi,Xj,Z)
@@ -40,9 +40,9 @@ function [e,Ji,Jj]=poseErrorAndJacobian(Xi,Xj,Z)
 
 #linearizes the robot-robot measurements
 # inputs:
-#   XR: the initial robot poses (4x4xnum_poses: array of homogeneous matrices)
+#   XR: the initial robot poses (3x3xnum_poses: array of homogeneous matrices)
 #   XL: the initial landmark estimates (3xnum_landmarks matrix of landmarks)
-#   ZR: the robot_robot measuremenrs (4x4xnum_measurements: array of homogeneous matrices)
+#   ZR: the robot_robot measuremenrs (3x3xnum_measurements: array of homogeneous matrices)
 #   associations: 2xnum_measurements. 
 #                 associations(:,k)=transpose([i_idx, j_idx]) means the kth measurement
 #                 refers to an observation made from pose i_idx, that
@@ -64,7 +64,7 @@ function [H,b, chi_tot, num_inliers]=linearizePoses(XR, XL, Zr, associations,num
   num_inliers=0;
   for (measurement_num=1:size(Zr,3))
     Omega=eye(6);
-    Omega(1:6,1:6)*=1e3; # we need to pimp the rotation  part a little
+    Omega(1:6,1:6)*=1e3;
     pose_i_index=associations(1,measurement_num);
     pose_j_index=associations(2,measurement_num);
     Z=Zr(:,:,measurement_num);
