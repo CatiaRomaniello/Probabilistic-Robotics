@@ -171,21 +171,14 @@ end
 
 
 
-num_landmarks = size(keys(landmark_observations), 2); 
+num_landmarks = size(keys(landmark_map), 2); 
 landmark_vector = zeros(4, num_landmarks); 
 epsilon = 1;
-landmark_keys = keys(landmark_observations);
+landmark_keys = keys(landmark_map);
 j = 1;
 for i = 1:num_landmarks
     actual_id = landmark_keys{i};  
-    
-    if isKey(landmark_map, actual_id)
-        landmark_vector(1:3, i) = landmark_map(actual_id);
-    else 
-        landmark_vector(1:3, i) = zeros(3,1);
-        j++;
-    end
-
+    landmark_vector(1:3, i) = landmark_map(actual_id);
     landmark_vector(4, i) = actual_id;
 end
 disp(j);
@@ -252,7 +245,7 @@ for i = 1:num_true_landmarks
 
         estimated_landmark = XL_guess(1:3, XL_guess(4, :) == actual_id); 
 
-        if ~isempty(estimated_landmark)&& norm(estimated_landmark) > 0
+        if ~isempty(estimated_landmark)
             error = norm(estimated_landmark - XL_true(:, actual_id+1));  
             sum_squared_errors = sum_squared_errors + error^2;  
             count_valid_landmarks = count_valid_landmarks + 1;  
@@ -283,7 +276,7 @@ disp(rmse_landmarks_optimized);
 damping=0.1;
 kernel_threshold=10;
 kernel_threshold_p=100;
-num_iterations=70;
+num_iterations=50;
 [XR, XL, chi_stats_p, num_inliers_p, chi_stats_r, num_inliers_r, H, b]=doTotalLS(XR_guess, XL_guess, 
 												      Zp, projection_associations, 
 												      Zr, pose_associations, 
@@ -336,7 +329,7 @@ for i = 1:num_true_landmarks
 
         estimated_landmark = XL(1:3, XL(4, :) == actual_id); 
 
-        if ~isempty(estimated_landmark)&& norm(estimated_landmark) > 0
+        if ~isempty(estimated_landmark)
             error = norm(estimated_landmark - XL_true(:, actual_id + 1));  
             if error>1
                 disp('-----');
@@ -386,7 +379,7 @@ plot(XL_true(1,:),XL_true(2,:),'b*',"linewidth",2);
 hold on;
 plot(XL(1,:),XL(2,:),'ro',"linewidth",2);
 legend("Landmark True", "Guess");grid;
-
+pause();
 
 figure(2);
 hold on;

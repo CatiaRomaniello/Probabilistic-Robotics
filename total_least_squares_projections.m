@@ -102,9 +102,6 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
     z=Zl(:,measurement_num);
     Xr=XR(:,:,pose_index);
     Xl = XL(1:3, landmark_index); 
-    if norm(Xl) == 0
-      continue;
-    end
     [is_valid, e,Jr,Jl] = projectionErrorAndJacobian(Xr, Xl, z, K,image_rows, image_cols, rTc);
     if (! is_valid)
        continue;
