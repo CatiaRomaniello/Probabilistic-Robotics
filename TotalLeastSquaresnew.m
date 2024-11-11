@@ -137,7 +137,7 @@ end
 for actual_id = keys(landmark_observations)
     observations = landmark_observations(actual_id{1});
     
-    if size(observations.image_points, 2) < 4
+    if size(observations.image_points, 2) < 5 %Changing this number changes the minimum number of observations required
         continue;  
     end
     image_points = observations.image_points;
@@ -175,13 +175,12 @@ num_landmarks = size(keys(landmark_map), 2);
 landmark_vector = zeros(4, num_landmarks); 
 epsilon = 1;
 landmark_keys = keys(landmark_map);
-j = 1;
 for i = 1:num_landmarks
     actual_id = landmark_keys{i};  
     landmark_vector(1:3, i) = landmark_map(actual_id);
     landmark_vector(4, i) = actual_id;
 end
-disp(j);
+
 
 
 XL_guess = landmark_vector;
@@ -266,17 +265,11 @@ disp(rmse_landmarks_optimized);
 
 ############################## CALL SOLVER  ################################## 
 
-# uncomment the following to suppress pose-landmark-projection measurements
-#num_landmarks=0;
-#Zp=zeros(3,0);
-
-# uncomment the following to suppress pose-pose measurements
-%Zr=zeros(3,3,0);
 
 damping=0.1;
 kernel_threshold=10;
 kernel_threshold_p=100;
-num_iterations=50;
+num_iterations=30;
 [XR, XL, chi_stats_p, num_inliers_p, chi_stats_r, num_inliers_r, H, b]=doTotalLS(XR_guess, XL_guess, 
 												      Zp, projection_associations, 
 												      Zr, pose_associations, 
@@ -304,7 +297,7 @@ for i = 2:num_poses
     error_T = inv(rel_T_optimized) * rel_T_gt;
     rot_error = atan2(error_T(2, 1), error_T(1, 1));
     rotation_errors = [rotation_errors; rot_error];
-    trans_error = norm(error_T(1:2, 3));  % Errore di traslazione (solo X e Y)
+    trans_error = norm(error_T(1:2, 3)); 
     translation_errors = [translation_errors; trans_error];
 end
 
@@ -415,7 +408,6 @@ pause();
 
 figure(4);
 title("Poses Comparison: True, Initial Guess, and After Optimization");
-
 plot(XR_true_vec(1,:), XR_true_vec(2,:), 'go', "linewidth", 2); 
 hold on;
 plot(XR_guess_vec(1,:), XR_guess_vec(2,:), 'ro', "linewidth", 2);
@@ -426,4 +418,19 @@ xlabel("X Position");
 ylabel("Y Position");
 hold off;
 pause();
+
+figure(5);
+title("Landmark After Optimization");
+hold on;
+view(3);
+plot3(XL_true(1,:), XL_true(2,:), XL_true(3,:), 'go', 'LineWidth', 2);
+plot3(XL_guess(1,:), XL_guess(2,:), XL_guess(3,:), 'ro', 'LineWidth', 2);
+plot3(XL(1,:), XL(2,:), XL(3,:), 'b*', 'LineWidth', 2);
+legend("Landmark True", "Guess");
+grid on;
+xlabel('X');
+ylabel('Y');
+zlabel('Z');
+pause();
+
 

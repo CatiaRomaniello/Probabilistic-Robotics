@@ -96,7 +96,7 @@ function [H,b, chi_tot, num_inliers]=linearizeProjections(XR, XL, Zl, associatio
     actual_id=associations(2,measurement_num);
     landmark_index = find(XL(4, :) == actual_id, 1);
     if isempty(landmark_index) 
-    continue; % Salta questo landmark se non è valido
+    continue; 
     end
 
     z=Zl(:,measurement_num);

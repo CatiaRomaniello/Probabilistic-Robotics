@@ -33,7 +33,7 @@ endfunction;
 # implementation of the optimization loop with robust kernel
 # applies a perturbation to a set of landmarks and robot poses
 # input:
-#   XR: the initial robot poses (4x4xnum_poses: array of homogeneous matrices)
+#   XR: the initial robot poses (3x3xnum_poses: array of homogeneous matrices)
 #   XL: the initial landmark estimates (3xnum_landmarks matrix of landmarks)
 #   Z:  the measurements (3xnum_measurements)
 #   associations: 2xnum_measurements. 

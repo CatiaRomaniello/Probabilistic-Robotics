@@ -26,6 +26,12 @@ By running the code, the terminal will show the RMSE before and after the optimi
 After a few minutes, it will show some plots comparing the results before (the initial guess and the ground truth) and after (the optimized results and the ground truth) the optimization.
 
 Below is a plot of the robot's trajectory considering the initial guess, the optimized result, and the ground truth.
-For more details and results, please refer to the report.pdf file.
+For more details and results, please refer to the **PR_report.pdf** file.
 
 ![Screenshot from 2024-11-06 20-35-24](https://github.com/user-attachments/assets/b0f50e24-01c8-4dda-9185-6723bd02ac36)
+
+
+![Screenshot from 2024-11-11 20-42-29](https://github.com/user-attachments/assets/cff9d582-1fb7-4b59-8804-eec8af439cf7)
+
+Once the code is started, as soon as the first plot is displayed, press enter to view all others. 
+If you press enter after Figure 5 is generated, it will close all the outputs.
