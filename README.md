@@ -18,7 +18,7 @@ cd Probabilistic-Robotics/
 finally, to run it 
 
 ```
-cd octave TotalLeastSquarenew.m
+octave TotalLeastSquarenew.m
 ```
 ## Results
 
